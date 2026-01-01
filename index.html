@@ -1,206 +1,103 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SzódogAdél 1.0</title>
 <style>
-body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
-.screen { display:none; padding:16px; }
-.screen.active { display:block; }
-button { padding:12px 16px; margin:8px 0; width:100%; font-size:16px; }
-h1,h2,h3 { text-align:center; }
-.progress { height:16px; background:#ddd; border-radius:8px; overflow:hidden; margin:8px 0; }
-.progress > div { height:100%; width:0%; background:#4caf50; transition:width 0.3s; }
-label { display:block; margin-top:12px; }
-input, select { width:100%; padding:8px; font-size:16px; }
-.card { background:white; padding:16px; border-radius:12px; }
-.bad { background:#f44336 !important; color:white; }
+body{font-family:Arial;margin:0;background:#f4f4f4}
+.screen{display:none;padding:16px}
+.screen.active{display:block}
+button{width:100%;padding:12px;margin:8px 0;font-size:16px}
+.card{background:#fff;padding:16px;border-radius:12px}
+.progress{height:16px;background:#ddd;border-radius:8px;overflow:hidden}
+.progress div{height:100%;width:0;background:#4caf50}
 </style>
 </head>
 <body>
 
 <div id="menu" class="screen active">
-  <h1>📘 SzódogAdél</h1>
-  <button onclick="startPractice()">▶️ Gyakorlás</button>
-  <button onclick="showScreen('settings')">⚙️ Beállítások</button>
+<h1>SzódogAdél 1.0</h1>
+<button onclick="startPractice()">Gyakorlás</button>
+<button onclick="show('upload')">Szókészlet feltöltés</button>
 </div>
 
-<div id="settings" class="screen">
-  <h2>⚙️ Beállítások</h2>
-  <div class="card">
-    <label>1. fázis pontcél</label>
-    <input type="number" id="p1" value="20" />
-    <label>2. fázis pontcél</label>
-    <input type="number" id="p2" value="20" />
-    <label>3. fázis – helyes szavak</label>
-    <input type="number" id="p3" value="10" />
-    <label>4. fázis – szódoga szavak</label>
-    <input type="number" id="p4" value="10" />
-    <button onclick="saveSettings()">💾 Mentés</button>
-    <button onclick="showScreen('menu')">⬅️ Vissza</button>
-  </div>
+<div id="upload" class="screen">
+<h2>CSV feltöltés</h2>
+<input type="file" accept=".csv" onchange="loadCSV(event)">
+<button onclick="show('menu')">Vissza</button>
 </div>
 
 <div id="practice" class="screen">
-  <h2 id="phaseTitle"></h2>
-  <div class="progress"><div id="phaseProgress"></div></div>
-  <p id="scoreLine"></p>
-  <div id="questionBox" class="card"></div>
+<h2 id="word"></h2>
+<div id="answers"></div>
+<p id="score"></p>
+<div class="progress"><div id="bar"></div></div>
 </div>
 
 <script>
-const vocab = {
-  "kutya":"dog","macska":"cat","ház":"house","autó":"car","alma":"apple",
-  "iskola":"school","asztal":"table","szék":"chair","víz":"water","kenyér":"bread"
+const builtInVocabs={
+"5december":{
+"all":"mindenki","like (prep.)":"úgy mint / olyan mint","other":"másik","painting":"festmény",
+"detective":"nyomozó","well (adv.)":"jól","active":"aktív","even":"sőt","problem":"gond, probléma",
+"find":"talál","help":"segít","dancer":"táncos","missing":"hiányzó","title":"cím",
+"helmet":"sisak","trick":"trükk","instruments":"hangszerek","goggles":"úszószemüveg",
+"take pictures":"fényképez","fly a kite":"sárkányt ereget","run fast":"gyorsan fut","climb a tree":"fára mászik",
+"vet":"állatorvos","big":"nagy","small":"kicsi","tail":"farok","over there":"ott","wing":"szárny",
+"different":"különböző","very much":"nagyon","broken":"törött","next":"következő","enter":"belép","for sure":"biztosan"
+}
 };
 
-let settings = JSON.parse(localStorage.getItem('szodogadel_settings')) || {
-  p1:20,p2:20,p3:10,p4:10
-};
+let vocab=builtInVocabs["5december"];
+let score=0;
 
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+function show(id){
+document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+document.getElementById(id).classList.add('active');
 }
-
-function saveSettings(){
-  settings = {
-    p1:+p1.value,p2:+p2.value,p3:+p3.value,p4:+p4.value
-  };
-  localStorage.setItem('szodogadel_settings', JSON.stringify(settings));
-  alert("Mentve");
-  showScreen('menu');
-}
-
-let phase=1,score=0,errors=0,hard={},current=null;
 
 function startPractice(){
-  phase=1;score=0;errors=0;hard={};
-  showScreen('practice');
-  document.getElementById('phaseTitle').textContent="1. fázis – Választás";
-  nextQ1();
+score=0;
+show('practice');
+next();
 }
 
-function nextQ1(){
-  const e=Object.entries(vocab);
-  current=e[Math.floor(Math.random()*e.length)];
-  let opts=[current[1]];
-  while(opts.length<3){
-    let r=e[Math.floor(Math.random()*e.length)][1];
-    if(!opts.includes(r)) opts.push(r);
-  }
-  opts.sort(()=>Math.random()-0.5);
-  scoreLine.innerHTML=`❌ ${errors} ⭐ ${score}/${settings.p1}`;
-  questionBox.innerHTML="<h3>"+current[0]+"</h3>"+
-    opts.map(o=>`<button onclick="ans1('${o}',this)">${o}</button>`).join('');
-  phaseProgress.style.width=(score/settings.p1*100)+"%";
+function next(){
+const entries=Object.entries(vocab);
+const pair=entries[Math.floor(Math.random()*entries.length)];
+const hu=pair[0], en=pair[1];
+document.getElementById('word').innerText=hu;
+let opts=[en];
+while(opts.length<3){
+let r=entries[Math.floor(Math.random()*entries.length)][1];
+if(!opts.includes(r))opts.push(r);
+}
+opts.sort(()=>Math.random()-0.5);
+document.getElementById('answers').innerHTML=opts.map(o=>'<button onclick="ans(\''+o+'\',\''+en+'\',this)">'+o+'</button>').join('');
+document.getElementById('score').innerText='Pont: '+score;
+document.getElementById('bar').style.width=Math.min(100,score)+'%';
 }
 
-function ans1(sel,btn){
-  if(sel===current[1]){
-    score++;
-    if(score>=settings.p1) return startPhase2();
-    nextQ1();
-  } else {
-    errors++; hard[current[0]]=(hard[current[0]]||0)+1;
-    btn.classList.add("bad");
-  }
+function ans(sel,cor,btn){
+if(sel===cor){score++;next();}
+else btn.style.background='red';
 }
 
-function startPhase2(){
-  phase=2;score=0;
-  document.getElementById('phaseTitle').textContent="2. fázis – Megerősítés";
-  nextQ2();
-}
-
-function weighted(){
-  let pool=[];
-  Object.entries(vocab).forEach(([h,e])=>{
-    pool.push([h,e]);
-    if(hard[h]) for(let i=0;i<hard[h];i++) pool.push([h,e]);
-  });
-  return pool;
-}
-
-function nextQ2(){
-  const pool=weighted();
-  current=pool[Math.floor(Math.random()*pool.length)];
-  let opts=[current[1]];
-  const e=Object.entries(vocab);
-  while(opts.length<3){
-    let r=e[Math.floor(Math.random()*e.length)][1];
-    if(!opts.includes(r)) opts.push(r);
-  }
-  opts.sort(()=>Math.random()-0.5);
-  scoreLine.innerHTML=`✔️ ${score}/${settings.p2}`;
-  questionBox.innerHTML="<h3>"+current[0]+"</h3>"+
-    opts.map(o=>`<button onclick="ans2('${o}')">${o}</button>`).join('');
-  phaseProgress.style.width=(score/settings.p2*100)+"%";
-}
-
-function ans2(sel){
-  if(sel===current[1]){
-    score++;
-    if(score>=settings.p2) return startPhase3();
-    nextQ2();
-  }
-}
-
-let attempts=0;
-function startPhase3(){
-  phase=3;score=0;
-  document.getElementById('phaseTitle').textContent="3. fázis – Írás";
-  nextQ3();
-}
-
-function norm(s){return s.toLowerCase().replace(/\s+/g,'');}
-
-function nextQ3(){
-  attempts=0;
-  const e=Object.entries(vocab);
-  current=e[Math.floor(Math.random()*e.length)];
-  scoreLine.innerHTML=`✍️ ${score}/${settings.p3}`;
-  questionBox.innerHTML=`<h3>${current[0]}</h3>
-    <input id="inp"><button onclick="chk3()">OK</button><p id="fb"></p>`;
-  phaseProgress.style.width=(score/settings.p3*100)+"%";
-}
-
-function chk3(){
-  const v=norm(inp.value),c=norm(current[1]);
-  if(v===c){
-    score++;
-    if(score>=settings.p3) return startPhase4();
-    nextQ3();
-  } else {
-    attempts++;
-    fb.textContent=attempts>=5?("Helyes: "+current[1]):"Próbáld újra";
-  }
-}
-
-let exam=[];
-function startPhase4(){
-  phase=4;
-  exam=Object.entries(vocab).sort(()=>Math.random()-0.5).slice(0,settings.p4);
-  document.getElementById('phaseTitle').textContent="4. fázis – Szódoga";
-  questionBox.innerHTML=`<form id="f">`+
-    exam.map((w,i)=>`<label>${w[0]}</label><input data-i="${i}">`).join("")+
-    `<button type="button" onclick="checkExam()">Kész</button></form>`;
-  phaseProgress.style.width="100%";
-}
-
-function checkExam(){
-  let ok=0,res="<h3>Eredmény</h3><ul>";
-  exam.forEach((w,i)=>{
-    const v=norm(document.querySelector('[data-i="'+i+'"]').value);
-    if(v===norm(w[1])) ok++;
-    else res+=`<li>${w[0]} – ${w[1]}</li>`;
-  });
-  res+="</ul>";
-  const p=ok/exam.length*100;
-  let g=p>=90?5:p>=75?4:p>=60?3:p>=40?2:1;
-  questionBox.innerHTML=res+`<p>Osztályzat: <strong>${g}</strong></p>
-  <button onclick="showScreen('menu')">🏠 Főmenü</button>`;
+function loadCSV(e){
+const f=e.target.files[0];
+const r=new FileReader();
+r.onload=()=>{
+const lines=r.result.split('\n');
+let v={};
+lines.forEach(l=>{
+const p=l.split(',');
+if(p.length>=2)v[p[0].trim()]=p[1].trim();
+});
+vocab=v;
+alert('CSV betöltve');
+show('menu');
+};
+r.readAsText(f);
 }
 </script>
 </body>
