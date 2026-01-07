@@ -4,10 +4,209 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SzódogAdél</title>
+
+<!-- XLSX támogatás -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+body { font-family: Arial, sans-serif; background:#f5f7fb; margin:0; }
+#app { max-width:720px; margin:auto; background:white; min-height:100vh; padding:16px; }
+h1,h2 { text-align:center; }
+button { padding:12px; margin:6px 0; width:100%; font-size:16px; }
+.progress { height:14px; background:#ddd; border-radius:7px; overflow:hidden; margin:10px 0;}
+.progress div { height:100%; background:#4caf50; width:0%; transition:width .3s; }
+.card { background:#fff; padding:16px; border-radius:12px; }
+.wrong { background:#f8b6b6; }
+img { display:block; margin:12px auto; max-width:160px; }
+select,input { width:100%; padding:8px; margin:6px 0; font-size:16px; }
+.hidden { display:none; }
+</style>
 </head>
+
 <body>
-<h1>SzódogAdél 1.0</h1>
-<img src="tacsko.png" alt="Tacskó">
-<p>Kész GitHub Pages kompatibilis verzió.</p>
+<div id="app">
+<h1>🐾 SzódogAdél</h1>
+
+<img src="tacsko.png" alt="Vidám tacskó">
+
+<!-- FŐMENÜ -->
+<div id="menu">
+  <button onclick="show('practice')">▶️ Gyakorlás</button>
+  <button onclick="show('upload')">📤 Feltöltés</button>
+  <button onclick="show('settings')">⚙️ Beállítások</button>
+</div>
+
+<div class="progress"><div id="bar"></div></div>
+
+<!-- KÉPERNYŐK -->
+<div id="practice" class="card hidden"></div>
+<div id="upload" class="card hidden"></div>
+<div id="settings" class="card hidden"></div>
+
+</div>
+
+<script>
+/* ====== SEGÉD ====== */
+function $(id){ return document.getElementById(id); }
+function show(id){
+  ['menu','practice','upload','settings'].forEach(s=>$(s).classList.add('hidden'));
+  if(id!=='menu') $(id).classList.remove('hidden');
+}
+function shuffle(a){ return [...a].sort(()=>Math.random()-0.5); }
+function progress(p){ $('bar').style.width = p+'%'; }
+
+/* ====== SZÓKÉSZLETEK ====== */
+const defaultVocab = {
+  "kutya":"dog","macska":"cat","ló":"horse","ház":"house","alma":"apple",
+  "iskola":"school","könyv":"book","asztal":"table","szék":"chair","autó":"car"
+};
+
+let vocabs = JSON.parse(localStorage.getItem("vocabs")||"{}");
+if(!vocabs["5december"]){
+  vocabs["5december"] = defaultVocab;
+  localStorage.setItem("vocabs",JSON.stringify(vocabs));
+}
+
+let activeVocab = localStorage.getItem("activeVocab") || "5december";
+
+/* ====== BEÁLLÍTÁSOK ====== */
+function renderSettings(){
+  $('settings').innerHTML = `
+    <h2>⚙️ Beállítások</h2>
+    <label>Szókészlet</label>
+    <select id="vsel">
+      ${Object.keys(vocabs).map(v=>`<option ${v===activeVocab?'selected':''}>${v}</option>`).join('')}
+    </select>
+    <button onclick="saveSettings()">Mentés</button>
+    <button onclick="show('menu')">⬅️ Vissza</button>
+  `;
+}
+function saveSettings(){
+  activeVocab = $('vsel').value;
+  localStorage.setItem("activeVocab",activeVocab);
+  alert("Mentve");
+  show('menu');
+}
+
+/* ====== FELTÖLTÉS ====== */
+function renderUpload(){
+  $('upload').innerHTML = `
+    <h2>📤 CSV / XLSX feltöltés</h2>
+    <input type="file" id="file" accept=".csv,.xlsx">
+    <input id="vname" placeholder="Szókészlet neve">
+    <button onclick="upload()">Feltöltés</button>
+    <p id="umsg"></p>
+    <button onclick="show('menu')">⬅️ Vissza</button>
+  `;
+}
+
+function upload(){
+  const f = $('file').files[0];
+  const n = $('vname').value.trim();
+  if(!f||!n){ alert("Hiányzó adat"); return; }
+  const r = new FileReader();
+  if(f.name.endsWith(".csv")){
+    r.onload=e=>parseCSV(e.target.result,n);
+    r.readAsText(f);
+  } else {
+    r.onload=e=>parseXLSX(e.target.result,n);
+    r.readAsArrayBuffer(f);
+  }
+}
+function parseCSV(t,n){
+  const v={};
+  t.split(/\r?\n/).forEach(l=>{
+    const [hu,en]=l.split(",");
+    if(hu&&en) v[hu.trim()]=en.trim();
+  });
+  saveVocab(n,v);
+}
+function parseXLSX(d,n){
+  const wb=XLSX.read(d,{type:"array"});
+  const s=wb.Sheets[wb.SheetNames[0]];
+  XLSX.utils.sheet_to_json(s,{header:1}).forEach(r=>{
+    if(r[0]&&r[1]) defaultVocab[r[0]]=r[1];
+  });
+  saveVocab(n,defaultVocab);
+}
+function saveVocab(n,v){
+  vocabs[n]=v;
+  localStorage.setItem("vocabs",JSON.stringify(vocabs));
+  $('umsg').innerText=`✅ ${n} mentve`;
+}
+
+/* ====== JÁTÉK FÁZISOK ====== */
+let entries, score, index, hard, current;
+
+/* 1. fázis */
+function startGame(){
+  entries = Object.entries(vocabs[activeVocab]);
+  score=0; hard=[];
+  phase1();
+}
+function phase1(){
+  if(score>=5){ score=0; phase2(); return; }
+  current=shuffle(entries)[0];
+  const opts=shuffle([current[1],...shuffle(entries).slice(0,2).map(e=>e[1])]);
+  $('practice').innerHTML=`<h2>1. fázis</h2><h3>${current[0]}</h3>`+
+    opts.map(o=>`<button onclick="a1('${o}',this)">${o}</button>`).join('')+
+    `<p>Pont: ${score}/5</p>`;
+  progress(score/5*100);
+}
+function a1(a,b){
+  if(a===current[1]){ score++; phase1(); }
+  else { b.className='wrong'; hard.push(current); }
+}
+
+/* 2. fázis */
+function phase2(){
+  if(score>=5){ index=0; phase3(); return; }
+  current=shuffle([...entries,...hard])[0];
+  const opts=shuffle([current[1],...shuffle(entries).slice(0,2).map(e=>e[1])]);
+  $('practice').innerHTML=`<h2>2. fázis</h2><h3>${current[0]}</h3>`+
+    opts.map(o=>`<button onclick="a2('${o}',this)">${o}</button>`).join('')+
+    `<p>Pont: ${score}/5</p>`;
+  progress(score/5*100);
+}
+function a2(a,b){
+  if(a===current[1]){ score++; phase2(); }
+  else b.className='wrong';
+}
+
+/* 3. fázis */
+function phase3(){
+  if(index>=entries.length){ phase4(); return; }
+  current=entries[index];
+  $('practice').innerHTML=`<h2>3. fázis</h2><h3>${current[0]}</h3>
+    <input id="i"><button onclick="a3()">OK</button>`;
+  progress(index/entries.length*100);
+}
+function a3(){
+  const v=$('i').value.toLowerCase().replace(/\s+/g,'');
+  if(v===current[1]){ index++; phase3(); }
+}
+
+/* 4. fázis */
+function phase4(){
+  $('practice').innerHTML=`<h2>Szódolgozat</h2>`+
+    entries.map((e,i)=>`${e[0]} <input id="t${i}"><br>`).join('')+
+    `<button onclick="grade()">Kész</button>`;
+  progress(100);
+}
+function grade(){
+  let ok=0;
+  entries.forEach((e,i)=>{
+    if($('t'+i).value.toLowerCase().trim()===e[1]) ok++;
+  });
+  const g=ok>=9?5:ok>=7?4:ok>=5?3:ok>=3?2:1;
+  $('practice').innerHTML=`<h2>Kész!</h2><p>${ok}/${entries.length}</p><h3>Jegy: ${g}</h3>`;
+}
+
+/* INIT */
+renderSettings();
+renderUpload();
+show('menu');
+</script>
 </body>
 </html>
+
