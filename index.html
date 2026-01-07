@@ -3,102 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SzódogAdél 1.0</title>
-<style>
-body{font-family:Arial;margin:0;background:#f4f4f4}
-.screen{display:none;padding:16px}
-.screen.active{display:block}
-button{width:100%;padding:12px;margin:8px 0;font-size:16px}
-.card{background:#fff;padding:16px;border-radius:12px}
-.progress{height:16px;background:#ddd;border-radius:8px;overflow:hidden}
-.progress div{height:100%;width:0;background:#4caf50}
-</style>
+<title>SzódogAdél</title>
 </head>
 <body>
-
-<div id="menu" class="screen active">
 <h1>SzódogAdél 1.0</h1>
-<button onclick="startPractice()">Gyakorlás</button>
-<button onclick="show('upload')">Szókészlet feltöltés</button>
-</div>
-
-<div id="upload" class="screen">
-<h2>CSV feltöltés</h2>
-<input type="file" accept=".csv" onchange="loadCSV(event)">
-<button onclick="show('menu')">Vissza</button>
-</div>
-
-<div id="practice" class="screen">
-<h2 id="word"></h2>
-<div id="answers"></div>
-<p id="score"></p>
-<div class="progress"><div id="bar"></div></div>
-</div>
-
-<script>
-const builtInVocabs={
-"5december":{
-"all":"mindenki","like (prep.)":"úgy mint / olyan mint","other":"másik","painting":"festmény",
-"detective":"nyomozó","well (adv.)":"jól","active":"aktív","even":"sőt","problem":"gond, probléma",
-"find":"talál","help":"segít","dancer":"táncos","missing":"hiányzó","title":"cím",
-"helmet":"sisak","trick":"trükk","instruments":"hangszerek","goggles":"úszószemüveg",
-"take pictures":"fényképez","fly a kite":"sárkányt ereget","run fast":"gyorsan fut","climb a tree":"fára mászik",
-"vet":"állatorvos","big":"nagy","small":"kicsi","tail":"farok","over there":"ott","wing":"szárny",
-"different":"különböző","very much":"nagyon","broken":"törött","next":"következő","enter":"belép","for sure":"biztosan"
-}
-};
-
-let vocab=builtInVocabs["5december"];
-let score=0;
-
-function show(id){
-document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-document.getElementById(id).classList.add('active');
-}
-
-function startPractice(){
-score=0;
-show('practice');
-next();
-}
-
-function next(){
-const entries=Object.entries(vocab);
-const pair=entries[Math.floor(Math.random()*entries.length)];
-const hu=pair[0], en=pair[1];
-document.getElementById('word').innerText=hu;
-let opts=[en];
-while(opts.length<3){
-let r=entries[Math.floor(Math.random()*entries.length)][1];
-if(!opts.includes(r))opts.push(r);
-}
-opts.sort(()=>Math.random()-0.5);
-document.getElementById('answers').innerHTML=opts.map(o=>'<button onclick="ans(\''+o+'\',\''+en+'\',this)">'+o+'</button>').join('');
-document.getElementById('score').innerText='Pont: '+score;
-document.getElementById('bar').style.width=Math.min(100,score)+'%';
-}
-
-function ans(sel,cor,btn){
-if(sel===cor){score++;next();}
-else btn.style.background='red';
-}
-
-function loadCSV(e){
-const f=e.target.files[0];
-const r=new FileReader();
-r.onload=()=>{
-const lines=r.result.split('\n');
-let v={};
-lines.forEach(l=>{
-const p=l.split(',');
-if(p.length>=2)v[p[0].trim()]=p[1].trim();
-});
-vocab=v;
-alert('CSV betöltve');
-show('menu');
-};
-r.readAsText(f);
-}
-</script>
+<img src="tacsko.png" alt="Tacskó">
+<p>Kész GitHub Pages kompatibilis verzió.</p>
 </body>
 </html>
